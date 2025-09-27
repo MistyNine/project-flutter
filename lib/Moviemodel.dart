@@ -17,13 +17,19 @@ class Movie {
 
   // สร้าง factory constructor เพื่อแปลง Map<String, dynamic> เป็น Object
   factory Movie.fromJson(Map<String, dynamic> json) {
+    // 💡 การแก้ไข: ใช้ Null-aware coalescing (??) และ Safe Casting (as type?) 
+    // เพื่อให้ไม่ Crash ถ้าฟิลด์เป็น null หรือประเภทข้อมูลผิดพลาด
+    
     return Movie(
-      date: json['date'] as String,
-      genre: json['genre'] as String,
-      isNowShowing: json['isNowShowing'] as bool,
-      poster: json['poster'] as String,
-      preorder: json['preorder'] as bool,
-      title: json['title'] as String,
+      // สำหรับ String: ถ้าเป็น null หรือไม่ใช่ String ให้ใช้สตริงว่าง "" หรือค่าเริ่มต้น
+      date: (json['date'] as String?) ?? 'ไม่ระบุวันที่',
+      genre: (json['genre'] as String?) ?? 'ไม่ระบุประเภท',
+      poster: (json['poster'] as String?) ?? '', // ใช้ String ว่าง ถ้าไม่มีรูป
+      title: (json['title'] as String?) ?? 'ชื่อหนังไม่ระบุ',
+      
+      // สำหรับ Bool: ถ้าเป็น null หรือไม่ใช่ bool ให้ใช้ false (ค่าเริ่มต้นที่ปลอดภัย)
+      isNowShowing: (json['isNowShowing'] as bool?) ?? false,
+      preorder: (json['preorder'] as bool?) ?? false,
     );
   }
 

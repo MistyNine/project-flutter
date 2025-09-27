@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:movie_cinema/firestore_service.dart';
-import 'package:movie_cinema/Moviemodel.dart';
+// ต้องมั่นใจว่า 2 ไฟล์นี้พร้อมใช้งาน
+import 'package:movie_cinema/firestore_service.dart'; 
+import 'package:movie_cinema/Moviemodel.dart'; 
 
 // ============================
 // Poster Widget Loader
@@ -21,8 +22,50 @@ Widget _poster(String path, {BoxFit fit = BoxFit.cover}) {
   );
 }
 
-class HomeScreen extends StatelessWidget {
+// ====================================================================
+// 🏠 HOMESCREEN - ถูกเปลี่ยนเป็น StatefulWidget เพื่อจัดการข้อมูลการค้นหา
+// ====================================================================
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  // 💾 ตัวแปรสำหรับเก็บรายการหนังทั้งหมดเพื่อใช้ในการค้นหา
+  List<Movie> _allMoviesForSearch = []; 
+  bool _isSearchDataLoading = true;
+  final FirestoreService _firestoreService = FirestoreService();
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchAllMoviesForSearch();
+  }
+
+  // 📡 ฟังก์ชันสำหรับดึงหนังทั้งหมด (กำลังฉาย + โปรแกรมหน้า) มาเก็บไว้ใช้ค้นหา
+  Future<void> _fetchAllMoviesForSearch() async {
+    try {
+      // ดึงข้อมูลแบบ Single Fetch (ใช้ .first) เพื่อนำมาใช้ในการค้นหา
+      final nowShowingFuture = _firestoreService.getNowShowingMovies().first; 
+      final comingSoonFuture = _firestoreService.getComingSoonMovies().first; 
+
+      final nowShowing = await nowShowingFuture;
+      final comingSoon = await comingSoonFuture;
+
+      setState(() {
+        // รวมรายการหนังทั้งสองประเภทเข้าด้วยกัน
+        _allMoviesForSearch = [...nowShowing, ...comingSoon];
+        _isSearchDataLoading = false;
+      });
+    } catch (e) {
+      print("Error fetching all movies for search: $e");
+      setState(() {
+        _isSearchDataLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -83,13 +126,34 @@ class HomeScreen extends StatelessWidget {
           ],
         ),
         actions: [
-          IconButton(
-            tooltip: 'ค้นหา',
-            icon: const Icon(Icons.search),
-            onPressed: () {
-              // TODO: แก้ไขให้ดึงข้อมูลจาก Firestore เมื่อเปิดหน้าค้นหา
-            },
+          // ✅ ปุ่มค้นหา (ใช้ _ActionChip)
+          Padding(
+            padding: const EdgeInsets.only(right: 6, left: 12),
+            child: _ActionChip(
+              icon: _isSearchDataLoading 
+                  ? Icons.hourglass_empty // แสดง Icon อื่นแทนการโหลดดิ้ง
+                  : Icons.search,
+              onTap: () {
+                if (_isSearchDataLoading) {
+                   ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('กำลังโหลดข้อมูลหนังสำหรับค้นหา...'),
+                      duration: Duration(seconds: 1),
+                    ),
+                  );
+                } else if (_allMoviesForSearch.isNotEmpty) {
+                  showSearch(
+                    context: context,
+                    delegate: MovieSearchDelegate(
+                      source: _allMoviesForSearch,
+                    ),
+                  );
+                }
+              },
+            ),
           ),
+          
+          // ปุ่มโปรไฟล์ (ใช้ _ActionChip)
           Padding(
             padding: const EdgeInsets.only(right: 12, left: 6),
             child: _ActionChip(
@@ -123,7 +187,9 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-// ✅ ปุ่ม action เล็ก ๆ (Search, Profile) — ใช้ InkWell + Ink ให้ ripple แสดงแน่นอน
+// --------------------------------------------------------------------
+// ✅ _ActionChip: ปุ่ม action เล็ก ๆ ที่มีเอฟเฟกต์ InkWell
+// --------------------------------------------------------------------
 class _ActionChip extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
@@ -154,10 +220,10 @@ class _ActionChip extends StatelessWidget {
     );
   }
 }
+// --------------------------------------------------------------------
 
-// ============================
 // 🎞 PROMO CAROUSEL (สไลด์โปรโมชัน)
-// ============================
+// --------------------------------------------------------------------
 class PromoCarousel extends StatefulWidget {
   const PromoCarousel({super.key});
 
@@ -239,10 +305,10 @@ class _PromoCarouselState extends State<PromoCarousel> {
     );
   }
 }
+// --------------------------------------------------------------------
 
-// ============================
 // 🍿 NOW SHOWING SECTION
-// ============================
+// --------------------------------------------------------------------
 class NowShowingSection extends StatelessWidget {
   const NowShowingSection({super.key});
 
@@ -426,10 +492,10 @@ class _MovieCardHorizontal extends StatelessWidget {
     );
   }
 }
+// --------------------------------------------------------------------
 
-// ============================
 // 🎬 COMING SOON SECTION (โปรแกรมหน้า)
-// ============================
+// --------------------------------------------------------------------
 class ComingSoonSection extends StatelessWidget {
   const ComingSoonSection({super.key});
 
@@ -506,9 +572,7 @@ class ComingSoonSection extends StatelessWidget {
   }
 }
 
-// ============================
 // 🎬 การ์ดหนัง Coming Soon (ไม่มีปุ่มเลือก)
-// ============================
 class _ComingSoonCard extends StatelessWidget {
   final String title, poster, genre, dateText;
   final bool preorder;
@@ -604,10 +668,10 @@ class _ComingSoonCard extends StatelessWidget {
     );
   }
 }
+// --------------------------------------------------------------------
 
-// ============================
 // 🧪 LATEST TECH SECTION
-// ============================
+// --------------------------------------------------------------------
 class LatestTechSection extends StatelessWidget {
   const LatestTechSection({super.key});
 
@@ -740,7 +804,10 @@ class _TechCard extends StatelessWidget {
     );
   }
 }
+// --------------------------------------------------------------------
 
+// 🔎 MOVIE SEARCH DELEGATE
+// --------------------------------------------------------------------
 class MovieSearchDelegate extends SearchDelegate<String> {
   final List<Movie> source;
   MovieSearchDelegate({required this.source});
@@ -861,7 +928,7 @@ class MovieSearchDelegate extends SearchDelegate<String> {
               arguments: m.toMap(),
             );
           },
-        );
+        );  
       },
     );
   }

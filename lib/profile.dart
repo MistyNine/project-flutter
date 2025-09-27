@@ -125,7 +125,10 @@ class ProfileScreen extends StatelessWidget {
             icon: Icons.logout,
             title: 'ออกจากระบบ',
             danger: true,
-            onTap: () {/* TODO */},
+            onTap: () {
+              AuthenticationService().logout();
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            },
           ),
         ],
       ),
