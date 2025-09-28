@@ -6,9 +6,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'dart:math';
-// 🔥🔥🔥 ต้องเพิ่ม Import สำหรับ SeatScreen (ปรับพาธตามไฟล์จริงของคุณ) 🔥🔥🔥
-import 'package:movie_cinema/seat_screen.dart';
 
+// ✅ ปรับพาธตามโปรเจ็กต์ของคุณ
+import 'package:movie_cinema/seat_screen.dart';
 
 class ShowtimesScreen extends StatefulWidget {
   final Map<String, dynamic> movie;
@@ -21,44 +21,30 @@ class ShowtimesScreen extends StatefulWidget {
 
 class _ShowtimesScreenState extends State<ShowtimesScreen> {
   late String _selectedDate;
-  List<dynamic> _showtimes = [];
+  List<Map<String, dynamic>> _showtimes = [];
   bool _isLoading = true;
 
-  // ตัวแปรสถานะสำหรับการค้นหาและกรอง
   String _searchQuery = '';
   String? _selectedFilter;
 
-  // ตัวแปรสถานะ: สำหรับเก็บค่า Rating ที่สุ่มมาเพียงครั้งเดียว
   late String _staticRandomRating;
-  // ตัวแปรสถานะ: สำหรับเก็บค่า Duration ที่สุ่มมาเพียงครั้งเดียว
   late String _staticRandomDuration;
 
-  // ตัวแปรสถานะ: สำหรับเก็บรายละเอียดภาพยนตร์เพิ่มเติมจาก 'movieDetails'
   Map<String, dynamic> _movieDetails = {};
   bool _isDetailsLoading = true;
 
-  // ตัวแปรสถานะ: ควบคุมการขยายเรื่องย่อ
   bool _isPlotExpanded = false;
 
-  String _getRandomRating() {
-    final randomValue = Random().nextInt(6) + 13;
-    return randomValue.toString();
-  }
-
-  String _getRandomDuration() {
-    final randomValue = Random().nextInt(51) + 100;
-    return randomValue.toString();
-  }
+  String _getRandomRating() => (Random().nextInt(6) + 13).toString();
+  String _getRandomDuration() => (Random().nextInt(51) + 100).toString();
 
   @override
   void initState() {
     super.initState();
     initializeDateFormatting('th', null);
     _selectedDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
-
     _staticRandomRating = _getRandomRating();
     _staticRandomDuration = _getRandomDuration();
-
     _fetchShowtimes();
     _fetchMovieDetails();
   }
@@ -75,43 +61,27 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
 
     try {
       final detailsRef = FirebaseFirestore.instance.collection('movieDetails');
-      final movieTitle = widget.movie['title'] as String?;
+      final movieTitle = (widget.movie['title'] as String?)?.trim();
 
       if (movieTitle == null || movieTitle.isEmpty) {
+        setState(() => _movieDetails = {'plot': 'ไม่มีเรื่องย่อให้บริการ'});
         return;
       }
 
-      // 🔥 โค้ดที่แก้ไข: ใช้ .trim() เพื่อตัดช่องว่างที่ไม่จำเป็นออกจากชื่อหนัง 🔥
-      final cleanMovieTitle = movieTitle.trim();
-      
-      // ใช้ชื่อที่ทำความสะอาดแล้วในการค้นหา Document ID
-      final docSnapshot = await detailsRef.doc(cleanMovieTitle).get();
+      final docSnapshot = await detailsRef.doc(movieTitle).get();
+
+      if (!mounted) return;
 
       if (docSnapshot.exists && docSnapshot.data() != null) {
-        if (mounted) {
-            setState(() {
-             _movieDetails = docSnapshot.data()!;
-            });
-        }
+        setState(() => _movieDetails = docSnapshot.data()!);
       } else {
-        if (mounted) {
-          setState(() {
-            _movieDetails = {'plot': 'ไม่มีเรื่องย่อให้บริการ'};
-          });
-        }
+        setState(() => _movieDetails = {'plot': 'ไม่มีเรื่องย่อให้บริการ'});
       }
     } catch (e) {
-      if (mounted) {
-          setState(() {
-             _movieDetails = {'plot': 'เกิดข้อผิดพลาดในการดึงเรื่องย่อ'};
-          });
-      }
+      if (!mounted) return;
+      setState(() => _movieDetails = {'plot': 'เกิดข้อผิดพลาดในการดึงเรื่องย่อ'});
     } finally {
-      if (mounted) {
-        setState(() {
-          _isDetailsLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isDetailsLoading = false);
     }
   }
 
@@ -123,39 +93,37 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
 
     try {
       final showtimesRef = FirebaseFirestore.instance.collection('showtimes');
-      final movieTitle = widget.movie['title'] as String?;
+      final movieTitle = (widget.movie['title'] as String?)?.trim();
 
       if (movieTitle == null || movieTitle.isEmpty) {
+        setState(() => _showtimes = []);
         return;
       }
 
-      // 🔥 โค้ดที่แก้ไข: ใช้ .trim() เพื่อทำความสะอาดชื่อหนังก่อนใช้ใน Query 🔥
-      final cleanMovieTitle = movieTitle.trim(); 
-
       final querySnapshot = await showtimesRef
-          .where('movieTitle', isEqualTo: cleanMovieTitle) // ⬅️ ใช้ชื่อที่ทำความสะอาดแล้ว
+          .where('movieTitle', isEqualTo: movieTitle)
           .where('date', isEqualTo: _selectedDate)
           .get();
 
-      if (mounted) {
-        setState(() {
-          _showtimes = querySnapshot.docs.map((doc) => doc.data()).toList();
-        });
-      }
+      if (!mounted) return;
+
+      final docs = querySnapshot.docs
+          .map((doc) => (doc.data() as Map<String, dynamic>))
+          .toList();
+
+      setState(() => _showtimes = docs);
     } catch (e) {
-      // จัดการข้อผิดพลาดในการดึงรอบฉายได้ที่นี่
-    } finally {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        // ถ้า error ให้ขึ้นรายการว่าง
+        setState(() => _showtimes = []);
       }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  List<DateTime> _getAvailableDates() {
-    return List.generate(7, (index) => DateTime.now().add(Duration(days: index)));
-  }
+  List<DateTime> _getAvailableDates() =>
+      List.generate(7, (index) => DateTime.now().add(Duration(days: index)));
 
   void _selectDate(DateTime date) {
     final newDate = DateFormat('yyyy-MM-dd').format(date);
@@ -171,14 +139,22 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
 
   String _getWeekday(int weekday) {
     switch (weekday) {
-      case DateTime.monday: return 'จ.';
-      case DateTime.tuesday: return 'อ.';
-      case DateTime.wednesday: return 'พ.';
-      case DateTime.thursday: return 'พฤ.';
-      case DateTime.friday: return 'ศ.';
-      case DateTime.saturday: return 'ส.';
-      case DateTime.sunday: return 'อา.';
-      default: return '';
+      case DateTime.monday:
+        return 'จ.';
+      case DateTime.tuesday:
+        return 'อ.';
+      case DateTime.wednesday:
+        return 'พ.';
+      case DateTime.thursday:
+        return 'พฤ.';
+      case DateTime.friday:
+        return 'ศ.';
+      case DateTime.saturday:
+        return 'ส.';
+      case DateTime.sunday:
+        return 'อา.';
+      default:
+        return '';
     }
   }
 
@@ -188,18 +164,9 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
       backgroundColor: Colors.black,
       body: CustomScrollView(
         slivers: [
-          // 1. Sliver AppBar
           _buildSliverAppBar(),
-
-          // 2. ส่วนรายละเอียดภาพยนตร์
-          SliverToBoxAdapter(
-            child: _buildMovieDetailSection(),
-          ),
-
-          // 3. เนื้อหาหลัก
-          SliverToBoxAdapter(
-            child: _buildContent(),
-          ),
+          SliverToBoxAdapter(child: _buildMovieDetailSection()),
+          SliverToBoxAdapter(child: _buildContent()),
         ],
       ),
     );
@@ -213,25 +180,24 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
     final displayRating = widget.movie['rating'] ?? _staticRandomRating;
     final displayDuration = _staticRandomDuration;
 
-    final String plot;
-    if (_isDetailsLoading) {
-      plot = 'กำลังโหลด...';
-    } else {
-      plot = _movieDetails['plot'] as String? ?? 'ไม่มีเรื่องย่อให้บริการ';
-    }
+    final String plot = _isDetailsLoading
+        ? 'กำลังโหลด...'
+        : (_movieDetails['plot'] as String?) ?? 'ไม่มีเรื่องย่อให้บริการ';
 
     final int maxLines = _isPlotExpanded ? 999 : 4;
 
-    final bool canBeExpanded = plot.length > 200 && !_isDetailsLoading && plot != 'ไม่มีเรื่องย่อให้บริการ' && plot != 'เกิดข้อผิดพลาดในการดึงเรื่องย่อ';
+    final bool canBeExpanded = plot.length > 200 &&
+        !_isDetailsLoading &&
+        plot != 'ไม่มีเรื่องย่อให้บริการ' &&
+        plot != 'เกิดข้อผิดพลาดในการดึงเรื่องย่อ';
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // --- 1. ชื่อเรื่อง, ประเภท, เรท ---
           Text(
-            widget.movie['title'] ?? 'N/A',
+            (widget.movie['title'] as String?) ?? 'N/A',
             style: GoogleFonts.kanit(
               fontSize: 28,
               fontWeight: FontWeight.bold,
@@ -241,55 +207,35 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
           const SizedBox(height: 4),
           Row(
             children: [
-              // 1. Genre และ Rate
               Text(
                 '${widget.movie['genre'] ?? 'N/A'} | Rate: $displayRating | ',
                 style: GoogleFonts.kanit(fontSize: 14, color: Colors.white70),
               ),
-
-              // 2. ไอคอนนาฬิกา
-              const Icon(
-                Icons.access_time,
-                color: Colors.white70,
-                size: 16,
-              ),
+              const Icon(Icons.access_time, color: Colors.white70, size: 16),
               const SizedBox(width: 4),
-
-              // 3. Duration และหน่วย 'นาที'
               Text(
                 '$displayDuration นาที',
                 style: GoogleFonts.kanit(fontSize: 14, color: Colors.white70),
               ),
-
               const Spacer(),
             ],
           ),
-
           const SizedBox(height: 16),
-
-          // --- 2. เรื่องย่อ ---
           Text(
             'เรื่องย่อ',
-            style: GoogleFonts.kanit(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+            style: GoogleFonts.kanit(
+                fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
           ),
           const SizedBox(height: 8),
-
-          // ข้อความเรื่องย่อ: ใช้ maxLines ที่เปลี่ยนแปลงตาม State
           Text(
             plot,
             style: GoogleFonts.kanit(fontSize: 14, color: Colors.white70),
             maxLines: maxLines,
             overflow: TextOverflow.ellipsis,
           ),
-
-          // --- 3. ปุ่ม "ดูเพิ่มเติม/ย่อหน้า" ---
           if (canBeExpanded)
             GestureDetector(
-              onTap: () {
-                setState(() {
-                  _isPlotExpanded = !_isPlotExpanded;
-                });
-              },
+              onTap: () => setState(() => _isPlotExpanded = !_isPlotExpanded),
               child: Padding(
                 padding: const EdgeInsets.only(top: 8.0),
                 child: Text(
@@ -302,7 +248,6 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
                 ),
               ),
             ),
-
           const SizedBox(height: 30),
         ],
       ),
@@ -310,6 +255,7 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
   }
 
   Widget _buildSliverAppBar() {
+    final poster = (widget.movie['poster'] as String?) ?? '';
     return SliverAppBar(
       backgroundColor: Colors.transparent,
       expandedHeight: 350,
@@ -318,24 +264,27 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
         icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
         onPressed: () => Navigator.pop(context),
       ),
-      actions: const [
-        Padding(
-          padding: EdgeInsets.only(right: 8.0),
-          child: Icon(Icons.more_horiz, color: Colors.white),
-        ),
-      ],
       flexibleSpace: FlexibleSpaceBar(
         background: Stack(
           children: [
             Positioned.fill(
-              child: CachedNetworkImage(
-                imageUrl: widget.movie['poster'] ?? '',
-                fit: BoxFit.cover,
-                color: Colors.black.withOpacity(0.5),
-                colorBlendMode: BlendMode.darken,
-                placeholder: (context, url) => const Center(child: CircularProgressIndicator(color: Colors.white)),
-                errorWidget: (context, url, error) => const Icon(Icons.movie, color: Colors.white, size: 80),
-              ),
+              child: poster.isEmpty
+                  ? Container(
+                      color: Colors.black,
+                      alignment: Alignment.center,
+                      child: const Icon(Icons.movie, color: Colors.white, size: 80),
+                    )
+                  : CachedNetworkImage(
+                      imageUrl: poster,
+                      fit: BoxFit.cover,
+                      color: Colors.black.withOpacity(0.5),
+                      colorBlendMode: BlendMode.darken,
+                      placeholder: (context, url) => const Center(
+                        child: CircularProgressIndicator(color: Colors.white),
+                      ),
+                      errorWidget: (context, url, error) =>
+                          const Icon(Icons.movie, color: Colors.white, size: 80),
+                    ),
             ),
           ],
         ),
@@ -386,10 +335,7 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
                     children: [
                       Text(
                         _getWeekday(date.weekday),
-                        style: GoogleFonts.kanit(
-                          color: Colors.white,
-                          fontSize: 14,
-                        ),
+                        style: GoogleFonts.kanit(color: Colors.white, fontSize: 14),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -427,14 +373,12 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
           child: _buildFilterBar(),
         ),
         const SizedBox(height: 20),
-
-        // แสดง CircularProgressIndicator ขณะโหลดรอบฉาย
         _isLoading
             ? const Center(
                 child: Padding(
                   padding: EdgeInsets.only(top: 50.0),
                   child: CircularProgressIndicator(color: Colors.redAccent),
-                )
+                ),
               )
             : _buildShowtimesList(),
         const SizedBox(height: 32),
@@ -454,9 +398,7 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
         onChanged: (value) {
           setState(() {
             _searchQuery = value;
-            if (_selectedFilter != null) {
-                _selectedFilter = null;
-            }
+            if (_selectedFilter != null) _selectedFilter = null;
           });
         },
         decoration: const InputDecoration(
@@ -471,7 +413,7 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
   }
 
   Widget _buildFilterBar() {
-    final filters = ['IMAX', '4DX', 'Screen X', 'Kids', 'LED', 'Dolby Atmos', 'Pet Cinema'];
+    const filters = ['IMAX', '4DX', 'Screen X', 'Kids', 'LED', 'Dolby Atmos', 'Pet Cinema'];
     return SizedBox(
       height: 40,
       child: ListView.separated(
@@ -485,11 +427,7 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
           return GestureDetector(
             onTap: () {
               setState(() {
-                if (isSelected) {
-                  _selectedFilter = null;
-                } else {
-                  _selectedFilter = filterName;
-                }
+                _selectedFilter = isSelected ? null : filterName;
                 _searchQuery = '';
               });
             },
@@ -500,12 +438,7 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
                 borderRadius: BorderRadius.circular(20),
               ),
               alignment: Alignment.center,
-              child: Text(
-                filterName,
-                style: GoogleFonts.kanit(
-                  color: Colors.white,
-                ),
-              ),
+              child: Text(filterName, style: GoogleFonts.kanit(color: Colors.white)),
             ),
           );
         },
@@ -514,27 +447,23 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
   }
 
   // ------------------------------------
-  // MARK: Showtimes List Builder (ปรับปรุงการจัดเรียง)
+  // MARK: Showtimes List Builder
   // ------------------------------------
 
   Widget _buildShowtimesList() {
-    // 1. กรองรอบฉาย
-    final filteredShowtimes = _showtimes.where((showtime) {
-      if (showtime == null || showtime is! Map<String, dynamic>) return false;
-
-      final cinemaName = showtime['cinema'] as String? ?? '';
-      final screenType = showtime['screenType'] as String? ?? '';
-
-      final matchesSearch = cinemaName.toLowerCase().contains(_searchQuery.toLowerCase());
-
+    // 1) กรองข้อมูลอย่างปลอดภัย
+    final filteredShowtimes = _showtimes.where((st) {
+      final cinemaName = (st['cinema'] as String?) ?? '';
+      final screenType = (st['screenType'] as String?) ?? '';
+      final matchesSearch =
+          cinemaName.toLowerCase().contains(_searchQuery.toLowerCase());
       final matchesFilter = _selectedFilter == null ||
-                            (screenType.isNotEmpty && screenType.toUpperCase().contains(_selectedFilter!.toUpperCase()));
-
+          (screenType.isNotEmpty &&
+              screenType.toUpperCase().contains(_selectedFilter!.toUpperCase()));
       return matchesSearch && matchesFilter;
     }).toList();
 
     if (_showtimes.isEmpty) {
-      // ไม่พบรอบฉายในวันที่เลือกเลย
       return Center(
         child: Padding(
           padding: const EdgeInsets.only(top: 50.0),
@@ -548,12 +477,11 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
     }
 
     if (filteredShowtimes.isEmpty) {
-      // พบรอบฉายในวันนี้ แต่ไม่ตรงกับ Search/Filter
       return Center(
         child: Padding(
           padding: const EdgeInsets.only(top: 50.0, left: 32.0, right: 32.0),
           child: Column(
-              mainAxisSize: MainAxisSize.min,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 'ไม่พบโรงภาพยนตร์หรือรอบฉายที่ตรงตามเงื่อนไข',
@@ -567,25 +495,17 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
       );
     }
 
-    // 2. จัดกลุ่มรอบฉาย
-    final groupedByCinemaAndScreenType = <String, List<dynamic>>{};
-    for (var showtime in filteredShowtimes) {
-      if (showtime == null || showtime is! Map<String, dynamic>) continue;
-
-      final cinemaName = showtime['cinema'] as String? ?? 'N/A Cinema';
-      final screenType = showtime['screenType'] as String? ?? '2D';
-      final groupingKey = '$cinemaName|$screenType';
-
-      if (!groupedByCinemaAndScreenType.containsKey(groupingKey)) {
-        groupedByCinemaAndScreenType[groupingKey] = [];
-      }
-      groupedByCinemaAndScreenType[groupingKey]!.add(showtime);
+    // 2) Group ด้วย key = cinema|screenType
+    final Map<String, List<Map<String, dynamic>>> grouped = {};
+    for (final st in filteredShowtimes) {
+      final cinemaName = (st['cinema'] as String?) ?? 'N/A Cinema';
+      final screenType = (st['screenType'] as String?) ?? '2D';
+      final key = '$cinemaName|$screenType';
+      (grouped[key] ??= []).add(st);
     }
 
-    // 3. จัดเรียงกลุ่ม
-    final sortedGroups = groupedByCinemaAndScreenType.entries.toList()
-      ..sort((a, b) => a.key.compareTo(b.key));
-
+    // 3) Sort group key
+    final sortedGroups = grouped.entries.toList()..sort((a, b) => a.key.compareTo(b.key));
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -608,29 +528,27 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
             final parts = entry.key.split('|');
             final cinemaName = parts[0];
             final screenType = parts.length > 1 ? parts[1] : '2D';
-
             final times = entry.value;
 
-            if (times.isEmpty) {
-                return const SizedBox.shrink();
-            }
-            
-            // จัดเรียงรอบฉายตามเวลาที่นี่ ก่อนส่งไปที่ _CinemaCard
-            final sortedTimes = List.from(times)..sort((a, b) {
-                final timeA = a['time'] as String? ?? '23:59';
-                final timeB = b['time'] as String? ?? '23:59';
-                return timeA.compareTo(timeB);
-            });
+            if (times.isEmpty) return const SizedBox.shrink();
+
+            // sort ตาม time (string HH:mm)
+            final sortedTimes = List<Map<String, dynamic>>.from(times)
+              ..sort((a, b) => ((a['time'] as String?) ?? '23:59')
+                  .compareTo(((b['time'] as String?) ?? '23:59')));
+
+            final location = (times.first['location'] as String?) ?? 'กรุงเทพมหานคร';
 
             return _CinemaCard(
-              // เพิ่ม Key เพื่อให้ State ของ Favorite ไม่หายไป
               key: ValueKey(entry.key),
-              movieTitle: widget.movie['title'] as String? ?? 'N/A Movie',
+              movieTitle: (widget.movie['title'] as String?) ?? 'N/A Movie',
               cinemaName: cinemaName,
-              location: times.first['location'] ?? 'กรุงเทพมหานคร',
-              showtimes: sortedTimes, // ⬅️ ส่ง List ที่ถูกจัดเรียงแล้ว
+              location: location,
+              showtimes: sortedTimes,
               screenType: screenType,
               selectedDate: _selectedDate,
+              // ✅ ส่งโปสเตอร์ไปการ์ด
+              posterUrl: widget.movie['poster'] as String?,
             );
           }).toList(),
         ],
@@ -644,21 +562,25 @@ class _ShowtimesScreenState extends State<ShowtimesScreen> {
 // ------------------------------------
 
 class _CinemaCard extends StatefulWidget {
-  final String movieTitle; 
+  final String movieTitle;
   final String cinemaName;
   final String location;
-  final List<dynamic> showtimes;
+  final List<Map<String, dynamic>> showtimes;
   final String screenType;
   final String selectedDate;
 
+  // ✅ เพิ่มตัวรับโปสเตอร์
+  final String? posterUrl;
+
   const _CinemaCard({
-    super.key, 
-    required this.movieTitle, 
+    super.key,
+    required this.movieTitle,
     required this.cinemaName,
     required this.location,
     required this.showtimes,
     required this.screenType,
     required this.selectedDate,
+    this.posterUrl,
   });
 
   @override
@@ -666,12 +588,9 @@ class _CinemaCard extends StatefulWidget {
 }
 
 class _CinemaCardState extends State<_CinemaCard> {
-  // สถานะการกดถูกใจ (Favorite State)
   bool _isFavorite = false;
-  // 🔥 สถานะการยุบ/ขยาย (เริ่มต้นให้ขยายอยู่)
-  bool _isExpanded = true; 
+  bool _isExpanded = true;
 
-  // ดึง UID ของผู้ใช้ที่กำลังล็อกอินอยู่
   final String? _currentUserId = FirebaseAuth.instance.currentUser?.uid;
   final String _favoriteCollectionName = 'user_favorites';
 
@@ -680,57 +599,56 @@ class _CinemaCardState extends State<_CinemaCard> {
     super.initState();
     _loadFavoriteStatus();
   }
-  
+
   // ------------------------------------
-  // MARK: Favorite Logic 
+  // MARK: Favorite Logic
   // ------------------------------------
 
   Future<void> _loadFavoriteStatus() async {
-    if (_currentUserId == null) {
-      return;
-    }
+    if (_currentUserId == null) return;
 
     try {
-      final docRef = FirebaseFirestore.instance.collection(_favoriteCollectionName).doc(_currentUserId);
+      final docRef = FirebaseFirestore.instance
+          .collection(_favoriteCollectionName)
+          .doc(_currentUserId);
       final docSnapshot = await docRef.get();
 
-      if (docSnapshot.exists && docSnapshot.data() != null) {
-        final favorites = docSnapshot.data()!['favoriteCinemas'] as List<dynamic>? ?? [];
+      if (!mounted) return;
 
-        if (mounted) {
-          setState(() {
-            _isFavorite = favorites.contains(widget.cinemaName);
-          });
-        }
+      if (docSnapshot.exists && docSnapshot.data() != null) {
+        final favorites =
+            (docSnapshot.data()!['favoriteCinemas'] as List<dynamic>? ?? [])
+                .cast<String>();
+        setState(() => _isFavorite = favorites.contains(widget.cinemaName));
       }
     } catch (e) {
       debugPrint('Error loading favorite status for $_currentUserId: $e');
     }
   }
 
-  void _toggleFavorite() async {
+  Future<void> _toggleFavorite() async {
     if (_currentUserId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('กรุณาเข้าสู่ระบบก่อนเพิ่มรายการโปรด')),
+        const SnackBar(content: Text('กรุณาเข้าสู่ระบบก่อนเพิ่มรายการโปรด')),
       );
       return;
     }
 
-    final docRef = FirebaseFirestore.instance.collection(_favoriteCollectionName).doc(_currentUserId);
-    final isCurrentlyFavorite = _isFavorite;
+    final docRef = FirebaseFirestore.instance
+        .collection(_favoriteCollectionName)
+        .doc(_currentUserId);
+    final wasFavorite = _isFavorite;
 
-    setState(() {
-      _isFavorite = !_isFavorite;
-    });
+    setState(() => _isFavorite = !wasFavorite);
 
     try {
-      if (!isCurrentlyFavorite) {
+      if (!wasFavorite) {
         await docRef.set({
           'favoriteCinemas': FieldValue.arrayUnion([widget.cinemaName])
         }, SetOptions(merge: true));
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('${widget.cinemaName} ถูกเพิ่มในรายการโปรดแล้ว ⭐')),
+            SnackBar(content: Text('${widget.cinemaName} ถูกเพิ่มในรายการโปรดแล้ว ⭐')),
           );
         }
       } else {
@@ -739,25 +657,22 @@ class _CinemaCardState extends State<_CinemaCard> {
         });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('${widget.cinemaName} ถูกนำออกจากรายการโปรดแล้ว')),
+            SnackBar(content: Text('${widget.cinemaName} ถูกนำออกจากรายการโปรดแล้ว')),
           );
         }
       }
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isFavorite = isCurrentlyFavorite; 
-        });
-        debugPrint('Firestore Error (Favorite Toggle): $e');
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('เกิดข้อผิดพลาดในการบันทึกสถานะ! (ตรวจสอบสิทธิ์ Firestore)')),
-        );
-      }
+      if (!mounted) return;
+      setState(() => _isFavorite = wasFavorite);
+      debugPrint('Firestore Error (Favorite Toggle): $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('เกิดข้อผิดพลาดในการบันทึกสถานะ! (ตรวจสอบสิทธิ์ Firestore)')),
+      );
     }
   }
-  
+
   // ------------------------------------
-  // MARK: Build UI
+  // MARK: Build UI helpers
   // ------------------------------------
 
   Widget _buildCinemaLogo(String cinemaName) {
@@ -779,18 +694,19 @@ class _CinemaCardState extends State<_CinemaCard> {
 
     return Text(
       logoText,
-      style: GoogleFonts.kanit(fontSize: 10, color: logoColor, fontWeight: FontWeight.bold),
+      style: GoogleFonts.kanit(
+          fontSize: 10, color: logoColor, fontWeight: FontWeight.bold),
     );
   }
 
   Widget _buildAttributeChip(String label, {Color? bgColor}) {
-    if (label.isEmpty) {
-      return const SizedBox.shrink();
-    }
+    if (label.isEmpty) return const SizedBox.shrink();
 
     Color finalBg = bgColor ?? const Color(0xFF333333);
 
-    if (label.contains('IMAX') || label.contains('พากย์ไทย') || label.contains('ซับอังกฤษ')) {
+    if (label.contains('IMAX') ||
+        label.contains('พากย์ไทย') ||
+        label.contains('ซับอังกฤษ')) {
       finalBg = Colors.redAccent;
     } else if (label.contains('4DX')) {
       finalBg = Colors.blue.shade900;
@@ -806,36 +722,37 @@ class _CinemaCardState extends State<_CinemaCard> {
       ),
       child: Text(
         label,
-        style: GoogleFonts.kanit(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
+        style: GoogleFonts.kanit(
+            fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
       ),
     );
   }
 
-  // Chip เวลาฉาย
   Widget _buildTimeChip(Map<String, dynamic> showtime, BuildContext context) {
-    final timeString = showtime['time'] as String? ?? 'N/A';
+    final timeString = (showtime['time'] as String?) ?? 'N/A';
     if (timeString == 'N/A') return const SizedBox.shrink();
 
-    final bool isToday = DateFormat('yyyy-MM-dd').format(DateTime.now()) == widget.selectedDate;
+    final bool isToday =
+        DateFormat('yyyy-MM-dd').format(DateTime.now()) == widget.selectedDate;
 
     DateTime? showtimeDateTime;
     try {
-      showtimeDateTime = DateFormat('yyyy-MM-dd HH:mm').parse('${widget.selectedDate} $timeString');
-    } catch (e) {
+      showtimeDateTime = DateFormat('yyyy-MM-dd HH:mm')
+          .parse('${widget.selectedDate} $timeString');
+    } catch (_) {
       return const SizedBox.shrink();
     }
 
     final bool isPast = isToday && showtimeDateTime.isBefore(DateTime.now());
 
-    final Color backgroundColor = isPast ? Colors.grey[900]! : const Color(0xFF222222);
+    final Color backgroundColor =
+        isPast ? Colors.grey[900]! : const Color(0xFF222222);
     final Color textColor = isPast ? Colors.white30 : Colors.white;
-    
-    final Border border = isPast 
-        ? Border.all(color: Colors.transparent) 
-        : Border.all(color: Colors.white, width: 1); 
+    final Border border =
+        isPast ? Border.all(color: Colors.transparent) : Border.all(color: Colors.white, width: 1);
 
-    // 🔥🔥🔥 ส่วนที่แก้ไข: การนำทางไปยัง SeatScreen พร้อมส่งข้อมูล 🔥🔥🔥
     void _goToSeatScreen() {
+      // ✅ ส่ง showtimeData แบบ Map<String,dynamic> ชัดเจน + โปสเตอร์
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -845,22 +762,23 @@ class _CinemaCardState extends State<_CinemaCard> {
             screenType: widget.screenType,
             selectedTime: timeString,
             selectedDate: widget.selectedDate,
-            showtimeData: showtime, // ส่งข้อมูลรอบฉายทั้งหมด
+            showtimeData: showtime,
+            posterUrl: widget.posterUrl, // ✅ ส่งต่อโปสเตอร์
           ),
         ),
       );
     }
-    
+
     return IgnorePointer(
       ignoring: isPast,
       child: GestureDetector(
-        onTap: _goToSeatScreen, // เรียกใช้ฟังก์ชันนำทาง
+        onTap: _goToSeatScreen,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
             color: backgroundColor,
             borderRadius: BorderRadius.circular(8),
-            border: border, 
+            border: border,
           ),
           child: Text(
             timeString,
@@ -877,13 +795,11 @@ class _CinemaCardState extends State<_CinemaCard> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.showtimes.isEmpty) {
-        return const SizedBox.shrink();
-    }
+    if (widget.showtimes.isEmpty) return const SizedBox.shrink();
 
     final firstShowtime = widget.showtimes.first;
-    final langCode = firstShowtime['language'] as String? ?? '';
-    final subCode = firstShowtime['subtitle'] as String? ?? '';
+    final langCode = (firstShowtime['language'] as String?) ?? '';
+    final subCode = (firstShowtime['subtitle'] as String?) ?? '';
 
     String langAndSubChip = '';
     String audioText = '';
@@ -891,7 +807,6 @@ class _CinemaCardState extends State<_CinemaCard> {
 
     if (langCode == 'TH') audioText = 'พากย์ไทย';
     if (langCode == 'EN') audioText = 'เสียงอังกฤษ';
-
     if (subCode == 'TH') subtitleText = 'ซับไทย';
     if (subCode == 'EN') subtitleText = 'ซับอังกฤษ';
 
@@ -913,7 +828,7 @@ class _CinemaCardState extends State<_CinemaCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // --- 1. ชื่อโรงและตำแหน่ง ---
+          // ชื่อโรง + ปุ่ม favorite + ปุ่มยุบ/ขยาย
           Row(
             children: [
               _buildCinemaLogo(widget.cinemaName),
@@ -921,31 +836,25 @@ class _CinemaCardState extends State<_CinemaCard> {
               Expanded(
                 child: Text(
                   widget.cinemaName,
-                  style: GoogleFonts.kanit(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold),
+                  style: GoogleFonts.kanit(
+                      fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              // ปุ่ม Favorite (Star Icon)
               GestureDetector(
                 onTap: _toggleFavorite,
                 child: Icon(
-                  _isFavorite ? Icons.star : Icons.star_border, 
+                  _isFavorite ? Icons.star : Icons.star_border,
                   size: 20,
-                  color: _isFavorite ? Colors.yellow.shade700 : Colors.white54, 
+                  color: _isFavorite ? Colors.yellow.shade700 : Colors.white54,
                 ),
               ),
               const SizedBox(width: 8),
-              
-              // ปุ่มยุบ/ขยาย (Arrow Icon)
               GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _isExpanded = !_isExpanded;
-                  });
-                },
+                onTap: () => setState(() => _isExpanded = !_isExpanded),
                 child: Icon(
-                  _isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, 
-                  size: 20, 
+                  _isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                  size: 20,
                   color: Colors.white54,
                 ),
               ),
@@ -960,21 +869,19 @@ class _CinemaCardState extends State<_CinemaCard> {
               ),
             ],
           ),
-          
-          // ส่วนที่ยุบ/ขยายได้
+
+          // ส่วนยุบ/ขยาย
           Visibility(
             visible: _isExpanded,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 12),
-                // --- 2. Chip ประเภทจอ, ภาษาเสียง, และซับไตเติล ---
                 Wrap(
                   spacing: 8.0,
                   children: [
                     _buildAttributeChip(widget.screenType),
-                    if (langAndSubChip.isNotEmpty)
-                      _buildAttributeChip(langAndSubChip),
+                    if (langAndSubChip.isNotEmpty) _buildAttributeChip(langAndSubChip),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -982,18 +889,19 @@ class _CinemaCardState extends State<_CinemaCard> {
             ),
           ),
 
-          // ส่วนที่ยุบ/ขยายได้ (เวลารอบฉาย)
+          // เวลารอบฉาย
           Visibility(
             visible: _isExpanded,
             child: Wrap(
               spacing: 8.0,
               runSpacing: 8.0,
-              // --- 3. เวลารอบฉาย ---
-              children: widget.showtimes.map((showtime) => _buildTimeChip(showtime as Map<String, dynamic>, context)).toList(),
+              children: widget.showtimes
+                  .map((st) => _buildTimeChip(st, context))
+                  .toList(),
             ),
           ),
         ],
-        ),
-      );
+      ),
+    );
   }
 }

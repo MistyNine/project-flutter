@@ -61,9 +61,9 @@ class _HomeScreenState extends State<HomeScreen> {
       });
     } catch (e) {
       print("Error fetching all movies for search: $e");
-      setState(() {
-        _isSearchDataLoading = false;
-      });
+      // setState(() {
+      //   _isSearchDataLoading = false;
+      // });
     }
   }
 

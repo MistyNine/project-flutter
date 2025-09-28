@@ -32,7 +32,7 @@ dependencies:
     sdk: flutter
   google_fonts: ^6.1.0
   cached_network_image: ^3.3.1
-  video_player: ^2.8.1
+  video_player: ^2.8.6
   intl: ^0.20.0
   share_plus: ^7.0.2
 
@@ -71,7 +71,7 @@ dev_dependencies:
 flutter:
   assets:
     - assets/images/
-    - assets/imageprofile/
+
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

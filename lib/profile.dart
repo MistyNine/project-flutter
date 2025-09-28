@@ -1,9 +1,19 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+// Import services and models
 import 'authentication.dart';
 import 'usermodel.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+
+// ✅ import หน้าใหม่
+import 'my_tickets_screen.dart';
+import 'login.dart'; 
+
+// 🎯 สมมติว่านี่คือหน้าจอใหม่ที่คุณจะสร้าง
+import 'about_us_screen.dart'; 
+// (คุณต้องสร้างไฟล์ about_us_screen.dart ด้วยตัวเอง)
 
 class ProfileScreen extends StatelessWidget {
   final QueryDocumentSnapshot? doc;
@@ -11,18 +21,14 @@ class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key, this.doc});
 
   Future<void> userprofile(UserModel user) async {
-    final docRef = FirebaseFirestore.instance
-        .collection("users")
-        .doc(user.id);
+    final docRef = FirebaseFirestore.instance.collection("users").doc(user.id);
 
     final snapshot = await docRef.get();
-    
+
     if (snapshot.exists) {
-      // Document exists, you can access its data
       final data = snapshot.data();
       print("Document data: $data");
     } else {
-      // Document does not exist
       print("No such document!");
     }
   }
@@ -32,7 +38,6 @@ class ProfileScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        // Set AppBar background color to match the Scaffold's background
         backgroundColor: Colors.black,
         elevation: 4.0,
         foregroundColor: Colors.white,
@@ -53,16 +58,13 @@ class ProfileScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // ส่วนหัวโปรไฟล์ที่ถูกปรับปรุง
+          // ส่วนหัวโปรไฟล์
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
             decoration: BoxDecoration(
               color: const Color(0xFF1C1C1C),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: Colors.white12,
-                width: 1,
-              ),
+              border: Border.all(color: Colors.white12, width: 1),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.2),
@@ -74,60 +76,70 @@ class ProfileScreen extends StatelessWidget {
             ),
             child: Row(
               children: [
-                 Image.asset(
-                  'assets/imageprofile/profile1.jpg',
-                  width: 56,
-                  height: 56,
-                ) 
-                // ??
-                // CircleAvatar(
-                //   radius: 28,
-                //   backgroundColor: Color(0xFF2A2A2A),
-                //   child:Icon(Icons.person, color: Colors.white70, size: 28),
-                // )
-                ,
+                const CircleAvatar(
+                  radius: 28, 
+                  backgroundColor: Colors.white10,
+                  child: Icon(Icons.person, color: Colors.white, size: 30),
+                ),
                 const SizedBox(width: 16),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('ผู้ใช้ใหม่', style: GoogleFonts.kanit(
-                      color: Colors.white, fontWeight: FontWeight.w700, fontSize: 18)),
-                    Text(AuthenticationService().getEmail() ?? 'ไม่เจอผู้ใช้', style: GoogleFonts.kanit(
-                      color: Colors.white70, fontSize: 13)),
+                    Text('ผู้ใช้ใหม่',
+                        style: GoogleFonts.kanit(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 18)),
+                    Text(AuthenticationService().getEmail() ?? 'ไม่เจอผู้ใช้',
+                        style: GoogleFonts.kanit(
+                            color: Colors.white70, fontSize: 13)),
                   ],
                 ),
               ],
             ),
           ),
-          
+
           const SizedBox(height: 24),
 
-          // เมนูตัวอย่าง
+          // ปุ่มตั๋วของฉัน
           _Tile(
             icon: Icons.confirmation_number_outlined,
             title: 'ตั๋วของฉัน',
-            onTap: () {/* TODO */},
-          ),
-          _Tile(
-            icon: Icons.person,
-            title: 'ข้อมูลส่วนตัว',
-            onTap: () {/* TODO */
-            userprofile(UserModel(
-              
-              email: AuthenticationService().getEmail() ?? 'ไม่เจอผู้ใช้',
-              photopath: doc != null ? doc!['photopath'] ?? '' : '',
-              id: doc != null ? doc!.id : 'ZtphnohCFjZXHqcc0i8y',
-            ));
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const MyTicketsScreen()),
+              );
             },
           ),
+
+          // ✅ แก้ไขเป็น 'ผู้จัดทำ' และนำทางไปหน้า AboutUsScreen
+          _Tile(
+            icon: Icons.info_outline, // เปลี่ยนไอคอนให้เหมาะสมยิ่งขึ้น
+            title: 'ผู้จัดทำ',
+            onTap: () {
+              // 🎯 นำทางไปยังหน้าจอที่คุณต้องการ (AboutUsScreen)
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AboutUsScreen()),
+              );
+              // โค้ดเดิม (userprofile) ถูกเอาออกไปแล้ว
+            },
+          ),
+
           const SizedBox(height: 12),
+
           _Tile(
             icon: Icons.logout,
             title: 'ออกจากระบบ',
             danger: true,
             onTap: () {
               AuthenticationService().logout();
-              Navigator.of(context).popUntil((route) => route.isFirst);
+              // โค้ดที่ทำให้ไปหน้า LoginScreen และล้าง History ทั้งหมด
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (context) => const LoginScreen()),
+                (route) => false,
+              );
             },
           ),
         ],
